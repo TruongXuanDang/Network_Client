@@ -1,8 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Project/Maven2/JavaApp/src/main/java/${packagePath}/${mainClassName}.java to edit this template
- */
-
 package com.mycompany.asm2client;
 
 import java.io.*;
@@ -10,45 +5,101 @@ import java.net.Socket;
 public class Asm2Client {
     public static void main(String argv[]) throws Exception
     {
-        String sentence_to_server;
-        String sentence_from_server;
-    
-        //Tạo Inputstream(từ bàn phím)
-        System.out.print("Account: ");
+        int accountAlert = 0;
+        int passwordAlert = 0;
+        int isExit = 0;
+        
+        //Inputstream from keyboard
         BufferedReader inFromUser =
             new BufferedReader(new InputStreamReader(System.in));
-        //Lấy chuỗi ký tự nhập từ bàn phím
-        sentence_to_server = inFromUser.readLine();
-//    
-        //Tạo socket cho client kết nối đến server qua ID address và port number
+
+        //Socket to connect server
         Socket clientSocket = new Socket("127.0.0.1", 5555);
     
-        //Tạo OutputStream nối với Socket
+        //OutputStream with Socket
         DataOutputStream outToServer =
             new DataOutputStream(clientSocket.getOutputStream());
     
-        //Tạo inputStream nối với Socket
+        //InputStream with Socket
         BufferedReader inFromServer =
             new BufferedReader(new
             InputStreamReader(clientSocket.getInputStream()));
-//     
-        //Gửi chuỗi ký tự tới Server thông qua outputStream đã nối với Socket (ở trên)
-        outToServer.writeBytes(sentence_to_server + '\n');
-    
-        //Đọc tin từ Server thông qua InputSteam đã nối với socket
-        sentence_from_server = inFromServer.readLine();
-    
-        //print kết qua ra màn hình
-        System.out.println("FROM SERVER: " + sentence_from_server);
+
+        //Authen
+        do{
+            accountAlert = authentication(inFromUser, outToServer, inFromServer, "Account");
+            if(accountAlert == 1)
+            {
+                passwordAlert = authentication(inFromUser, outToServer, inFromServer, "Password");
+                if(passwordAlert == 1)
+                {
+                    System.out.println("Login successful");
+                }
+                else
+                {
+                    System.out.println("Password incorrect");
+                }
+            }
+            else
+            {
+                System.out.println("Not found user");
+            }
+        }while(accountAlert == 0 || passwordAlert == 0);
         
-        //More
-        System.out.print("Password: ");
-        sentence_to_server = inFromUser.readLine();
-        outToServer.writeBytes(sentence_to_server + '\n');
-        sentence_from_server = inFromServer.readLine();
-        System.out.println("FROM SERVER: " + sentence_from_server);
-    
-        //Đóng liên kết socket
-        clientSocket.close();    
+        //Message with server
+        do{
+            isExit = messageWithServer(outToServer, inFromUser, inFromServer);
+        }while(isExit == 0);
+        
+        //Close socket
+        exit(clientSocket, outToServer, inFromServer);    
     } 
+    
+    //Authen
+    private static int authentication(BufferedReader inFromUser, DataOutputStream outToServer, BufferedReader inFromServer, String checkedValue) throws IOException
+    {
+        System.out.print(checkedValue+ ": ");
+        String accountInput = inFromUser.readLine();
+        outToServer.writeBytes(checkedValue + " " + accountInput + '\n');
+        return inFromServer.read();
+    }
+    
+    //Message with server
+    private static int messageWithServer(DataOutputStream outToServer, BufferedReader inFromUser, BufferedReader inFromServer) throws IOException
+    {
+        System.out.print("Send to server (Enter exit to halt program): ");
+        String messageFrom = inFromUser.readLine();
+        if(messageFrom.equals("exit"))
+        {
+            return 1;
+        }
+        else 
+        {
+            outToServer.writeBytes("ECHO " + messageFrom + '\n');
+            String messageTo = inFromServer.readLine();
+            System.out.println("Reply from server: " + messageTo);
+            
+            String[] values = messageTo.split(" ", 2);
+            String header = values[0];
+            
+            if(header.equals("Error"))
+            {
+                return 1;
+            }
+            else
+            {
+                return 0;
+            }
+            
+        }
+    }
+    
+    //Close socket
+    private static void exit(Socket clientSocket, DataOutputStream outToServer, BufferedReader inFromServer) throws IOException
+    {
+        outToServer.writeBytes("LOGOUT" + '\n');
+        String messageTo = inFromServer.readLine();
+        System.out.println("Reply from server: " + messageTo);
+        clientSocket.close();
+    }
 }
